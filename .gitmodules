@@ -1,3 +1,6 @@
 [submodule "Vim"]
 	path = Vim
 	url = ./Vim
+[submodule "Vmamba"]
+	path = Vmamba
+	url = https://github.com/MzeroMiko/VMamba.git

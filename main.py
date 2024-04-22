@@ -9,7 +9,7 @@ from torch.utils.tensorboard import SummaryWriter
 from load_dataset import SatelliteDataset
 from nets import (
     VisionTransformer, SwinTransformer, ConvNeXt, ResNet50, DenseNet121, DenseNet169,
-    DenseNet201, EfficientNetB0, EfficientNetB7,VisionMambaNet
+    DenseNet201, EfficientNetB0, EfficientNetB7
 )
 from sklearn.metrics import f1_score, precision_score, recall_score
 import matplotlib.pyplot as plt
@@ -21,7 +21,10 @@ def train(model, dataloader, criterion, optimizer, device):
         inputs, labels = inputs.to(device), labels.to(device)
         optimizer.zero_grad()
         outputs = model(inputs)
-        loss = criterion(outputs, labels)
+        if args.loss == "bce":
+            loss = criterion(outputs.squeeze(), labels.float())
+        else:
+            loss = criterion(outputs, labels)
         loss.backward()
         optimizer.step()
         running_loss += loss.item() * inputs.size(0)
@@ -39,21 +42,32 @@ def _evaluate_set(model, dataloader, criterion, device):
     total = 0
     y_true = []
     y_pred = []
+
     with torch.no_grad():
         for inputs, labels in dataloader:
             inputs, labels = inputs.to(device), labels.to(device)
             outputs = model(inputs)
-            loss = criterion(outputs, labels)
+
+            if args.loss == "bce":
+                loss = criterion(outputs.squeeze(), labels.float())
+                threshold = 0.5
+                preds = (outputs.squeeze() >= threshold).long()
+            else:
+                loss = criterion(outputs, labels)
+                _, preds = torch.max(outputs, 1)
+
             running_loss += loss.item() * inputs.size(0)
-            _, preds = torch.max(outputs, 1)
             correct += torch.sum(preds == labels.data).item()
             total += labels.size(0)
             y_true.extend(labels.cpu().numpy())
             y_pred.extend(preds.cpu().numpy())
+
+
     accuracy = correct / total if total != 0 else 0.0
     f1 = f1_score(y_true, y_pred, average='weighted', zero_division=1)
     precision = precision_score(y_true, y_pred, average='weighted', zero_division=1)
     recall = recall_score(y_true, y_pred, average='weighted', zero_division=1)
+
     return running_loss / len(dataloader.dataset), accuracy, f1, precision, recall
 
 def plot_metrics(train_losses, val_losses, test_losses, val_accuracies, test_accuracies, val_f1_scores, test_f1_scores,
@@ -128,33 +142,32 @@ def main(args):
 
     # Create the model
     if args.model == "vit":
-        model = VisionTransformer(num_classes=args.num_classes, num_channels=len(args.bands.split(",")))
+        model = VisionTransformer(num_classes=args.num_classes, num_channels=len(args.bands.split(",")), loss=args.loss, use_weights=args.use_weights)
     elif args.model == "swin":
-        model = SwinTransformer(num_classes=args.num_classes, num_channels=len(args.bands.split(",")))
+        model = SwinTransformer(num_classes=args.num_classes, num_channels=len(args.bands.split(",")), loss=args.loss, use_weights=args.use_weights)
     elif args.model == "convnext":
-        model = ConvNeXt(num_classes=args.num_classes, num_channels=len(args.bands.split(",")))
+        model = ConvNeXt(num_classes=args.num_classes, num_channels=len(args.bands.split(",")), loss=args.loss, use_weights=args.use_weights)
     elif args.model == "resnet50":
-        model = ResNet50(num_classes=args.num_classes, num_channels=len(args.bands.split(",")))
+        model = ResNet50(num_classes=args.num_classes, num_channels=len(args.bands.split(",")), loss=args.loss, use_weights=args.use_weights)
     elif args.model == "densenet121":
-        model = DenseNet121(num_classes=args.num_classes, num_channels=len(args.bands.split(",")))
+        model = DenseNet121(num_classes=args.num_classes, num_channels=len(args.bands.split(",")), loss=args.loss, use_weights=args.use_weights)
     elif args.model == "densenet169":
-        model = DenseNet169(num_classes=args.num_classes, num_channels=len(args.bands.split(",")))
+        model = DenseNet169(num_classes=args.num_classes, num_channels=len(args.bands.split(",")), loss=args.loss, use_weights=args.use_weights)
     elif args.model == "densenet201":
-        model = DenseNet201(num_classes=args.num_classes, num_channels=len(args.bands.split(",")))
+        model = DenseNet201(num_classes=args.num_classes, num_channels=len(args.bands.split(",")), loss=args.loss, use_weights=args.use_weights)
     elif args.model == "efficientnet_b0":
-        model = EfficientNetB0(num_classes=args.num_classes, num_channels=len(args.bands.split(",")))
+        model = EfficientNetB0(num_classes=args.num_classes, num_channels=len(args.bands.split(",")), loss=args.loss, use_weights=args.use_weights)
     elif args.model == "efficientnet_b7":
-        model = EfficientNetB7(num_classes=args.num_classes, num_channels=len(args.bands.split(",")))
-    elif args.model == "mamba":
-        model = VisionMambaNet(num_classes=args.num_classes, num_channels=len(args.bands.split(",")))
-    elif args.model == "vit_l":
-        model = VisionTransformer_Large(num_classes=args.num_classes, num_channels=len(args.bands.split(",")))
+        model = EfficientNetB7(num_classes=args.num_classes, num_channels=len(args.bands.split(",")), loss=args.loss, use_weights=args.use_weights)
     else:
         raise ValueError(f"Unsupported model: {args.model}")
     model.to(device)
 
     class_weights = torch.tensor([2.0, 1.0]).to(device)
-    criterion = nn.CrossEntropyLoss(weight=class_weights)
+    if args.loss == "crossentropy":
+        criterion = nn.CrossEntropyLoss(weight=class_weights)
+    elif args.loss == "bce":
+        criterion = nn.BCELoss()
 
     if args.optimizer == "sgd":
         optimizer = optim.SGD(model.parameters(), lr=args.learning_rate, momentum=0.9, weight_decay=0.0001)
@@ -247,5 +260,7 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, default=25, help="Number of epochs")
     parser.add_argument("--optimizer", type=str, default="adam", help="Optimizer to use (sgd, adam, rmsprop)")
     parser.add_argument("--output_dir", type=str, default="results", help="Directory to save the trained models and plots")
+    parser.add_argument("--loss", type=str, default="crossentropy", help="Loss function to use (crossentropy, bce)")
+    parser.add_argument("--use_weights", action="store_true", help="Use pre-trained weights for the model")
     args = parser.parse_args()
     main(args)
