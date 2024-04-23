@@ -71,9 +71,10 @@ class SatelliteDataset(Dataset):
         return image_files, labels
 
     def _get_transform(self):
+        num_channels = len(self.bands)
         transform = transforms.Compose([
             transforms.Resize((224, 224)),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            transforms.Normalize(mean=[0.5] * num_channels, std=[0.5] * num_channels),
         ])
         return transform
 
@@ -81,7 +82,7 @@ class SatelliteDataset(Dataset):
         image_file = self.image_files[index]
         label = self.labels[index]
         image = tiff.imread(image_file)
-        selected_bands = image[:, :, self.bands]  # Select the desired bands
+        selected_bands = image[:, :, tuple(self.bands)]
         selected_bands = np.transpose(selected_bands, (2, 0, 1))  # Change to (C, H, W) format
         selected_bands = torch.from_numpy(selected_bands)  # Convert to PyTorch tensor
         if self.transform:
