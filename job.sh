@@ -18,9 +18,9 @@ singularity exec --nv \
 
 source /scratch/wz1492/miniconda3/etc/profile.d/conda.sh
 
-models=( "resnet50" "efficientnet_b0" "vit" "swin" )
+models=( "resnet50" "efficientnet_b0" "vit" "swin" "vmamba" )
 
-
+conda activate vmamba
 
 # Iterate over hyperparameter combinations
 for model in "${models[@]}"; do
@@ -32,8 +32,3 @@ for model in "${models[@]}"; do
   python main.py --model "$model" --epochs 50 --bands "0,1,2,3,4,5,6,7,8,9,10,11" --loss bce
   
 done
-
-conda activate vmamba
-
-  python main.py --model vmamba --epochs 50 --bands "0,1,2" --use_weights --loss bce
-  python main.py --model vmamba --epochs 50 --bands "0,1,2,3,4,5,6,7,8,9,10,11" --loss bce

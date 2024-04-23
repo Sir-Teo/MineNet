@@ -13,15 +13,14 @@ from helpers import NestedNamespace
 class VSSM_Model(nn.Module):
     def __init__(self, num_classes, num_channels,loss="bce", use_weights=True):
         super(VSSM_Model, self).__init__()
-        if use_weights:
-            checkpoint = torch.load('/scratch/wz1492/MineNet/VMamba/weights/vssm_base_0229_ckpt_epoch_237.pth')
-            with open("/scratch/wz1492/MineNet/VMamba/weights/vssm_base_224.yaml") as stream:
-                try:
-                    config = yaml.safe_load(stream)
-                except yaml.YAMLError as exc:
-                    print(exc)
+        checkpoint = torch.load('/scratch/wz1492/MineNet/VMamba/weights/vssm_base_0229_ckpt_epoch_237.pth')
+        with open("/scratch/wz1492/MineNet/VMamba/weights/vssm_base_224.yaml") as stream:
+            try:
+                config = yaml.safe_load(stream)
+            except yaml.YAMLError as exc:
+                print(exc)
 
-            config = NestedNamespace(config)
+        config = NestedNamespace(config)
         self.model = VSSM(
             num_classes=num_classes,
             num_channels=num_channels,
@@ -43,8 +42,13 @@ class VSSM_Model(nn.Module):
         )
 
         
-        self.model.load_state_dict(checkpoint['model'], strict=False)
-
+        # Load weights except for the classifier
+        if use_weights:
+            model_dict = self.model.state_dict()
+            pretrained_dict = {k: v for k, v in checkpoint['model'].items() if 'classifier.head' not in k}
+            model_dict.update(pretrained_dict)
+            self.model.load_state_dict(model_dict, strict=False)
+            
         for p in self.model.parameters():
             p.requires_grad = True
         if loss == "crossentropy":
