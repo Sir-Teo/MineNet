@@ -23,7 +23,7 @@ class VSSM_Model(nn.Module):
         config = NestedNamespace(config)
         self.model = VSSM(
             num_classes=num_classes,
-            num_channels=num_channels,
+            in_chans=num_channels,
             depths=config.MODEL.VSSM.DEPTHS, 
             dims=config.MODEL.VSSM.EMBED_DIM, 
             # ===================
