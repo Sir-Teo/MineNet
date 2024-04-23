@@ -3,7 +3,65 @@ import torch.nn as nn
 from torchvision.models import resnet50, densenet121, densenet169, densenet201, efficientnet_b0, efficientnet_b7, vit_b_16, swin_t, convnext_tiny
 import sys
 import os
+sys.path.append('VMamba/classification')
+import yaml
 
+from models.vmamba import VSSM
+from helpers import NestedNamespace
+
+
+class VSSM_Model(nn.Module):
+    def __init__(self, num_classes, num_channels,loss="bce", use_weights=True):
+        super(VSSM_Model, self).__init__()
+        if use_weights:
+            checkpoint = torch.load('/scratch/wz1492/MineNet/VMamba/weights/vssm_base_0229_ckpt_epoch_237.pth')
+            with open("/scratch/wz1492/MineNet/VMamba/weights/vssm_base_224.yaml") as stream:
+                try:
+                    config = yaml.safe_load(stream)
+                except yaml.YAMLError as exc:
+                    print(exc)
+
+            config = NestedNamespace(config)
+        self.model = VSSM(
+            num_classes=num_classes,
+            num_channels=num_channels,
+            depths=config.MODEL.VSSM.DEPTHS, 
+            dims=config.MODEL.VSSM.EMBED_DIM, 
+            # ===================
+            ssm_d_state=config.MODEL.VSSM.SSM_D_STATE,
+            ssm_ratio=config.MODEL.VSSM.SSM_RATIO,
+            ssm_dt_rank=("auto" if config.MODEL.VSSM.SSM_DT_RANK == "auto" else int(config.MODEL.VSSM.SSM_DT_RANK)),
+            ssm_conv=config.MODEL.VSSM.SSM_CONV,
+            ssm_conv_bias=config.MODEL.VSSM.SSM_CONV_BIAS,
+            forward_type=config.MODEL.VSSM.SSM_FORWARDTYPE,
+            # ===================
+            mlp_ratio=config.MODEL.VSSM.MLP_RATIO,
+            # ===================
+            drop_path_rate=config.MODEL.DROP_PATH_RATE,
+            downsample_version=config.MODEL.VSSM.DOWNSAMPLE,
+            patchembed_version=config.MODEL.VSSM.PATCHEMBED,
+        )
+
+        
+        self.model.load_state_dict(checkpoint['model'], strict=False)
+
+        for p in self.model.parameters():
+            p.requires_grad = True
+        if loss == "crossentropy":
+            self.model.classifier.head = nn.Linear(self.model.num_features, num_classes)
+        elif loss == "bce":
+            self.model.classifier.head = nn.Sequential(
+                nn.Linear(self.model.num_features, 256),
+                nn.ReLU(inplace=True),
+                nn.Dropout(0.5),
+                nn.Linear(256, 1),
+                nn.Sigmoid()
+            )
+        
+
+    def forward(self, x):
+        x = self.model(x)
+        return x
 
 class VisionTransformer(nn.Module):
     def __init__(self, num_classes, num_channels, loss="bce", use_weights=True):

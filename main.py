@@ -9,7 +9,7 @@ from torch.utils.tensorboard import SummaryWriter
 from load_dataset import SatelliteDataset
 from nets import (
     VisionTransformer, SwinTransformer, ConvNeXt, ResNet50, DenseNet121, DenseNet169,
-    DenseNet201, EfficientNetB0, EfficientNetB7
+    DenseNet201, EfficientNetB0, EfficientNetB7, VSSM_Model
 )
 from sklearn.metrics import f1_score, precision_score, recall_score
 import matplotlib.pyplot as plt
@@ -159,6 +159,8 @@ def main(args):
         model = EfficientNetB0(num_classes=args.num_classes, num_channels=len(args.bands.split(",")), loss=args.loss, use_weights=args.use_weights)
     elif args.model == "efficientnet_b7":
         model = EfficientNetB7(num_classes=args.num_classes, num_channels=len(args.bands.split(",")), loss=args.loss, use_weights=args.use_weights)
+    elif args.model == "vmamba":
+        model = VSSM_Model(num_classes=args.num_classes, num_channels=len(args.bands.split(",")), use_weights=args.use_weights)
     else:
         raise ValueError(f"Unsupported model: {args.model}")
     model.to(device)

@@ -28,8 +28,12 @@ for model in "${models[@]}"; do
   echo "Running: $run_name"
 
 
-  python main.py --model "$model" --epochs 60 --bands "0,1,2" --use_weights --loss bce
-  python main.py --model "$model" --epochs 60 --bands "0,1,2,3,4,5,6,7,8,9,10,11" --loss bce
+  python main.py --model "$model" --epochs 50 --bands "0,1,2" --use_weights --loss bce
+  python main.py --model "$model" --epochs 50 --bands "0,1,2,3,4,5,6,7,8,9,10,11" --loss bce
   
 done
 
+conda activate vmamba
+
+  python main.py --model vmamba --epochs 50 --bands "0,1,2" --use_weights --loss bce
+  python main.py --model vmamba --epochs 50 --bands "0,1,2,3,4,5,6,7,8,9,10,11" --loss bce
